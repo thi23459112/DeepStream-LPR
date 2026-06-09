@@ -1,0 +1,116 @@
+[property]
+
+gpu-id=0
+# 使用哪張 GPU
+# 0 = 第一張 GPU
+# 多 GPU 系統才需要改
+
+net-scale-factor=0.0039215697906911373
+# 輸入影像縮放（= 1/255）
+# 用來把 0~255 轉成 0~1
+# 幾乎所有 YOLO 都固定這個值
+
+model-color-format=0
+# 輸入影像格式
+# 0 = RGB
+# 1 = BGR
+# 要跟模型訓練一致（錯會影響準確度）
+
+#onnx-file=weight/car.onnx
+# ONNX 模型路徑（用來建立 engine）
+
+model-engine-file=model_b2_gpu0_fp16.engine
+# TensorRT engine（已編譯）
+# 有這個會直接載入，不會重新轉 ONNX
+
+#int8-calib-file=calib.table
+# INT8 校正檔（你現在沒用）
+# 用 INT8 才需要
+
+labelfile-path=labels.txt
+# 類別名稱（顯示用）
+
+batch-size=4
+# 當時權重設定輸出的batch
+# ↑ 越大：吞吐量↑（多路串流）
+# ↓ 越小：延遲↓（單路建議 1）
+
+network-mode=2
+# 精度模式
+# 0 = FP32（最準最慢）
+# 1 = INT8（最快）
+# 2 = FP16（你現在，用GPU最佳平衡）
+
+num-detected-classes=7
+# 模型輸出類別數量
+# 必須跟訓練一致
+
+interval=0
+# 幾幀跑一次 detector
+# 0 = 每一幀都跑（最準）
+# 1 = 每2幀跑一次（省算力）
+# ↑ 越大：FPS ↑ 但 tracking 壓力↑
+
+gie-unique-id=1
+# 這個 inference 的 ID（pipeline 用）
+# 多個 GIE 時用來區分
+
+process-mode=1
+# 處理模式
+# 1 = Primary GIE（整張圖）
+# 2 = Secondary GIE（ROI 上跑）
+
+network-type=0
+# 網路類型
+# 0 = Detector（你現在）
+# 1 = Classifier
+
+cluster-mode=2
+# bbox clustering 方法
+# 0 = 無
+# 1 = DBSCAN
+# 2 = NMS（你現在，YOLO標準）
+
+maintain-aspect-ratio=1
+# 是否保持比例
+# 1 = 不拉伸（會 padding）
+# 0 = 直接拉伸（可能變形）
+
+symmetric-padding=1
+# padding 是否對稱（上下左右平均補）
+# 1 = 對稱（畫面置中）
+# 0 = 偏一邊（可能影響 bbox）
+
+#workspace-size=2000
+# TensorRT workspace（MB）
+# ↑ 越大：可能更優化，但吃記憶體
+
+parse-bbox-func-name=NvDsInferParseYolo
+# bbox 解析函數（CPU版）
+
+#parse-bbox-func-name=NvDsInferParseYoloCuda
+# GPU 版本 parser（通常更快，但要配合實作）
+
+custom-lib-path=nvdsinfer_custom_impl_Yolo/libnvdsinfer_custom_impl_Yolo.so
+# YOLO 自訂解析 library 路徑
+
+engine-create-func-name=NvDsInferYoloCudaEngineGet
+# 建立 TensorRT engine 的函數（YOLO專用）
+
+
+[class-attrs-all]
+
+nms-iou-threshold=0.45
+# NMS（非極大值抑制）IOU 門檻
+# ↓ 越小：更嚴格 → bbox 變少
+# ↑ 越大：更多重疊框會留下
+
+pre-cluster-threshold=0.25
+# NMS 前的信心門檻
+# ↓ 越小：更多候選框（可能增加誤檢）
+# ↑ 越大：更乾淨，但可能漏檢
+
+topk=300
+# 每幀最多保留幾個 bbox（NMS 前）
+# ↑ 越大：保留更多候選（吃算力）
+# ↓ 越小：速度快，但可能漏小物件

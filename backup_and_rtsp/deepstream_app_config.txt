@@ -1,0 +1,214 @@
+
+[application]
+enable-perf-measurement=1
+# 是否顯示效能（FPS）
+# 1 = 開啟（會在 terminal 印 FPS）
+# 0 = 關閉
+
+perf-measurement-interval-sec=1
+# 幾秒更新一次 FPS
+# ↓ 越小：更新更即時
+# ↑ 越大：數據更平滑
+
+
+[tiled-display]
+enable=1
+# 是否啟用多畫面拼接（tiled）
+# 1 = 顯示多路拼接畫面
+# 0 = 單路顯示
+
+rows=2
+columns=2
+# 畫面排版（2x2 = 最多4路）
+
+width=1280
+height=720
+# 輸出畫面解析度（整個拼接後畫面）
+# ↑ 越大：畫質好但吃GPU
+# ↓ 越小：省資源
+
+gpu-id=0
+# 使用哪張 GPU
+
+nvbuf-memory-type=0
+# 記憶體類型（Jetson通常用0）
+# 0 = default（最通用）
+
+
+[source0]
+enable=1
+# 啟用此來源
+
+type=3
+# 來源類型
+# 3 = 檔案（影片）
+# 2 = RTSP
+# 1 = camera
+
+uri=file:///home/nvidia/DeepStream-Yolo/videos/test1.mp4
+# 影片路徑
+
+num-sources=1
+# 這個 source block 裡有幾個來源（通常1）
+
+gpu-id=0
+
+cudadec-memtype=0
+# 解碼記憶體類型
+# 0 = default（Jetson OK）
+
+
+[source1]
+enable=1
+type=3
+uri=file:///home/nvidia/DeepStream-Yolo/videos/test2.mp4
+num-sources=1
+gpu-id=0
+cudadec-memtype=0
+# 第二路來源（你現在是雙路）
+
+[source2]
+enable=1
+type=3
+uri=file:///home/nvidia/DeepStream-Yolo/videos/test3.mp4
+num-sources=1
+gpu-id=0
+cudadec-memtype=0
+# 第二路來源（你現在是雙路）
+
+[source3]
+enable=1
+type=3
+uri=file:///home/nvidia/DeepStream-Yolo/videos/test4.mp4
+num-sources=1
+gpu-id=0
+cudadec-memtype=0
+# 第二路來源（你現在是雙路）
+
+[sink0]
+enable=1
+# 是否輸出畫面
+
+type=2
+# sink 類型
+# 2 = EGL 顯示（螢幕顯示）
+# 3 = file
+# 4 = RTSP
+
+sync=0
+# 是否同步播放
+# 0 = 不同步（跑最快，FPS最大）
+# 1 = 同步（照影片時間播放）
+
+gpu-id=0
+
+nvbuf-memory-type=0
+
+
+[osd]
+enable=1
+# 是否顯示 bbox / 文字
+
+gpu-id=0
+
+border-width=4
+# bbox 線條粗細
+# ↑ 越大：線更粗
+
+text-size=15
+# 文字大小
+
+text-color=1;1;1;1;
+# 文字顏色（RGBA）
+# 這裡是白色
+
+text-bg-color=0.3;0.3;0.3;1
+# 文字背景色（半透明灰）
+
+font=Serif
+# 字型
+
+show-clock=0
+# 是否顯示時間
+
+clock-x-offset=800
+clock-y-offset=820
+# 時鐘位置
+
+clock-text-size=12
+clock-color=1;0;0;0
+# 時鐘顏色（紅）
+
+nvbuf-memory-type=0
+
+process-mode=1
+
+
+[streammux]
+gpu-id=0
+
+live-source=0
+# 是否是即時串流
+# 0 = 檔案（你現在）
+# 1 = RTSP / camera
+
+batch-size=4
+# 一次處理幾路（要等於 source 數）
+# 你現在2路 → 設2（正確）
+
+batched-push-timeout=40000
+# 等待 batch 滿的時間（微秒）
+# ↓ 越小：延遲低
+# ↑ 越大：可能等更多 frame（多路用）
+
+width=1920
+height=1080
+# 送進 inference 前的 resize 尺寸
+# ⚠️ 很重要（影響效能）
+
+enable-padding=0
+# 是否保持比例
+# 0 = 直接拉伸
+# 1 = 保持比例 + padding
+
+nvbuf-memory-type=0
+
+
+[primary-gie]
+enable=1
+gpu-id=0
+gie-unique-id=1
+
+nvbuf-memory-type=0
+
+config-file=config_infer_primary_yolo11.txt
+# 你的 YOLO 設定檔（剛剛那份）
+
+
+# ==========================================
+# 追蹤器設定 (使用 NvDCF)
+# ==========================================
+[tracker]
+enable=1
+# 啟用 tracker
+
+tracker-width=640
+tracker-height=384
+# tracker 內部運算解析度
+# ↓ 越小：更快（但準確度下降）
+# ↑ 越大：更準但吃GPU
+
+ll-lib-file=/opt/nvidia/deepstream/deepstream/lib/libnvds_nvmultiobjecttracker.so
+# tracker library（固定）
+
+ll-config-file=/home/nvidia/DeepStream-Yolo/config_tracker_NvDCF_accuracy.yml
+# tracker 參數檔（你剛剛調的那份）
+
+gpu-id=0
+
+
+[tests]
+file-loop=0
+# 是否循環播放影片
+# 1 = 重播
+# 0 = 播完停止
