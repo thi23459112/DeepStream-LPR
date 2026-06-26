@@ -25,7 +25,10 @@ import time
 import select
 import termios
 import tty
-
+# 啟用新版 nvstreammux：多路檔案來源時某一路先 EOS 不拖慢其餘來源。
+# 必須在 import gi 之前，GStreamer 載入 nvstreammux 外掛時才讀得到。
+import os
+os.environ.setdefault("USE_NEW_NVSTREAMMUX", "yes")
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstRtspServer', '1.0')
@@ -306,12 +309,22 @@ def main():
     )
 
     streammux = make_elm("nvstreammux", "Stream-muxer")
-    streammux.set_property("width", 1920)
-    streammux.set_property("height", 1080)
-    streammux.set_property("batch-size", num_sources)
-    streammux.set_property("batched-push-timeout", 70000)
-    streammux.set_property("live-source", 1)
-    streammux.set_property("nvbuf-memory-type", 0)
+    streammux.set_property("batch-size", num_sources)  # 新舊版 mux 皆支援
+
+    if os.environ.get("USE_NEW_NVSTREAMMUX") == "yes":
+        # 新版 mux：不接受 width/height/live-source 等舊屬性，改用 config_mux.txt
+        _mux_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_mux.txt")
+        if os.path.exists(_mux_cfg):
+            streammux.set_property("config-file-path", _mux_cfg)
+        else:
+            print(f"[WARNING] 找不到 {_mux_cfg}，新版 mux 將用內建預設值")
+    else:
+        # 舊版 mux：維持原本設定
+        streammux.set_property("width", 1920)
+        streammux.set_property("height", 1080)
+        streammux.set_property("batched-push-timeout", 70000)
+        streammux.set_property("live-source", 1)
+        streammux.set_property("nvbuf-memory-type", 0)
     g_pipeline.add(streammux)
 
     # ---- 步驟 4: 每路 cam 建一個 uridecodebin ----
