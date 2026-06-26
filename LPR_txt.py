@@ -81,6 +81,12 @@ INFER_PLATE_CONFIG     = f"{BASE_DIR}/config_infer_secondary_plate.txt"
 INFER_NUM_CONFIG       = f"{BASE_DIR}/config_infer_secondary_num.txt"
 ANALYTICS_CONFIG       = f"{BASE_DIR}/config_nvdsanalytics.txt"
 TRACKER_RUNTIME_CONFIG = f"{BASE_DIR}/config_tracker_runtime.txt"
+MUX_CONFIG             = f"{BASE_DIR}/config_mux.txt"
+
+# --- 新版 nvstreammux 批次調校（僅在 USE_NEW_NVSTREAMMUX=yes 時生效）---
+# overall-min-fps 自動取各 YAML stream_fps 最高值，但不低於此下限（離線解碼快於即時，保底 30）。
+MUX_MIN_FPS_FLOOR   = 30
+MUX_OVERALL_MAX_FPS = 120
 
 # --- 已實作的 BoxMOT 追蹤器白名單 ---
 # A 級：純 motion-only，1×1 dummy frame 即可
@@ -698,6 +704,30 @@ def generate_tracker_runtime_config(cfgs: List[Dict[str, Any]]) -> str:
 
     return mode
 
+def generate_mux_config(cfgs: List[Dict[str, Any]]) -> None:
+    """
+    產生 config_mux.txt 給新版 nvstreammux (USE_NEW_NVSTREAMMUX=yes) 讀取。
+    解決：多路檔案來源中某一路先 EOS 時，舊版 mux 空等那一路、每批卡到逾時，剩餘來源 FPS 大跌。
+    adaptive-batching=1 讓 batch 跟現存來源數走；overall-min-fps 決定湊不滿時的強制推出頻率=尾段最低 FPS。
+    """
+    fps_list = [float(c.get("stream_fps", 30.0)) for c in cfgs]
+    src_fps = max(fps_list) if fps_list else 30.0
+    min_fps = max(int(round(src_fps)), MUX_MIN_FPS_FLOOR)
+    max_fps = max(min_fps, MUX_OVERALL_MAX_FPS)
+
+    lines = [
+        "[property]",
+        "algorithm-type=1",
+        "adaptive-batching=1",
+        "max-fps-control=0",
+        f"overall-max-fps-n={max_fps}",
+        "overall-max-fps-d=1",
+        f"overall-min-fps-n={min_fps}",
+        "overall-min-fps-d=1",
+    ]
+    with open(MUX_CONFIG, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"[INFO] config_mux.txt: 來源最高 stream_fps={src_fps:.0f} → overall-min-fps={min_fps}")
 
 # ==========================================
 # 9. 設定檔產生：deepstream_app_config
@@ -900,6 +930,7 @@ def main() -> None:
     generate_analytics_config(cfgs, muxer_w, muxer_h)
     generate_deepstream_app_config(cfgs, muxer_w, muxer_h)
     tracker_mode = generate_tracker_runtime_config(cfgs)
+    generate_mux_config(cfgs)
 
     # 步驟 4: 印摘要
     print("\n[DONE] 所有設定檔產生完畢！")
