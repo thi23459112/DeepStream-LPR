@@ -315,7 +315,7 @@ def _build_display_sink(pipeline, num_sources, has_live_source=False):
         # 舊版 mux：維持原本設定
         streammux2.set_property("width", 1920)
         streammux2.set_property("height", 1080)
-        streammux2.set_property("batched-push-timeout", 70000)
+        streammux2.set_property("batched-push-timeout", 10000)
         # ⭐ live-source 依主線是否有 live 來源決定，不可寫死 1
         streammux2.set_property("live-source", 1 if has_live_source else 0)
         streammux2.set_property("nvbuf-memory-type", 0)
