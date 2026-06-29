@@ -30,7 +30,8 @@ import numpy as np
 
 # 自動偵測專案根目錄 (本檔位於 <project_root>/logic/config.py)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-YAML_DIR = f"{BASE_DIR}/ds_yaml"
+# YAML_DIR = f"{BASE_DIR}/ds_yaml"
+YAML_DIR = os.environ.get("DS_YAML_DIR", f"{BASE_DIR}/ds_yaml")
 
 # --- DeepStream 主要設定檔路徑 ---
 INFER_CONFIG       = f"{BASE_DIR}/config_infer_primary_yolo11.txt"
