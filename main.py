@@ -25,6 +25,7 @@ import time
 import select
 import termios
 import tty
+import signal
 # 啟用新版 nvstreammux：多路檔案來源時某一路先 EOS 不拖慢其餘來源。
 # 必須在 import gi 之前，GStreamer 載入 nvstreammux 外掛時才讀得到。
 import os
@@ -465,46 +466,52 @@ def main():
     else:
         print("[INFO] 無 cam 啟用 RTSP 推流，跳過 RTSP server 啟動")
 
-    # ---- 步驟 10: 鍵盤監聽 + 主迴圈 ----
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
+    # ---- 步驟 10: 訊號處理 +（有終端機才）鍵盤監聽 + 主迴圈 ----
+    g_loop = GLib.MainLoop()
+
+    # systemctl stop/restart 送 SIGTERM；Ctrl+C 送 SIGINT。在主迴圈內安全處理：
+    # 送 EOS 讓影片收尾，再排程強制退出，確保 finally 的 force_finalize_all() 一定跑到。
+    def _on_stop_signal(_user_data):
+        global g_eos_triggered
+        print("\n[INFO] 收到停止訊號（SIGTERM/SIGINT），準備安全退出並存檔...")
+        if g_pipeline and not g_eos_triggered:
+            g_eos_triggered = True
+            g_pipeline.send_event(Gst.Event.new_eos())
+            GLib.timeout_add_seconds(8, force_quit_loop)
+        return GLib.SOURCE_CONTINUE
+
+    GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGTERM, _on_stop_signal, None)
+    GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, _on_stop_signal, None)
+
+    # 只有真的有終端機（互動執行）時才設鍵盤監聽。
+    # systemd 服務底下沒有 TTY，這段必須跳過，否則 termios.tcgetattr 會直接報錯、程式還沒跑就掛。
+    interactive = sys.stdin.isatty()
+    fd = None
+    old_settings = None
+    if interactive:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
         tty.setcbreak(fd)
         GLib.io_add_watch(fd, GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN, keyboard_cb)
         print("\n[INFO] 💡 提示：在終端機按下 'q' 鍵即可優雅退出並存檔...\n")
+    else:
+        print("\n[INFO] 非互動模式（無終端機）：鍵盤監聽停用，請用 'systemctl stop' 安全停止。\n")
 
-        g_loop = GLib.MainLoop()
+    try:
         bus = g_pipeline.get_bus()
         bus.add_signal_watch()
         bus.connect("message", bus_call, g_loop)
 
         g_pipeline.set_state(Gst.State.PLAYING)
         g_loop.run()
-
-    except KeyboardInterrupt:
-        # Ctrl+C：發送 EOS 後再跑一次迴圈等影片寫完
-        print("\n[INFO] 收到 Ctrl+C，準備發送 EOS...")
-        if not g_eos_triggered:
-            g_eos_triggered = True
-            g_pipeline.send_event(Gst.Event.new_eos())
-            GLib.timeout_add_seconds(8, force_quit_loop)
-        try:
-            g_loop.run()
-        except KeyboardInterrupt:
-            print("\n[INFO] 強制終止！")
-            pass
-
     finally:
-        # 還原終端機設定、flush DB（含截圖寫檔）、停 pipeline、銷毀 Object Encoder
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        if interactive and fd is not None and old_settings is not None:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         force_finalize_all()
         g_pipeline.set_state(Gst.State.NULL)
-
-        # 截圖 context 在結算寫檔完成後才銷毀
         if g_obj_enc_ctx is not None:
             try:
                 pyds.nvds_obj_enc_destroy_context(g_obj_enc_ctx)
-                print("[INFO] Object Encoder context 已銷毀")
             except Exception as e:
                 print(f"[WARNING] 銷毀 Object Encoder context 失敗：{e}")
 
