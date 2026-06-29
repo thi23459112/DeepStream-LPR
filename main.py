@@ -29,7 +29,7 @@ import signal
 # 啟用新版 nvstreammux：多路檔案來源時某一路先 EOS 不拖慢其餘來源。
 # 必須在 import gi 之前，GStreamer 載入 nvstreammux 外掛時才讀得到。
 import os
-os.environ.setdefault("USE_NEW_NVSTREAMMUX", "yes")
+os.environ.setdefault("USE_NEW_NVSTREAMMUX", "no")
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstRtspServer', '1.0')
@@ -323,7 +323,7 @@ def main():
         # 舊版 mux：維持原本設定
         streammux.set_property("width", 1920)
         streammux.set_property("height", 1080)
-        streammux.set_property("batched-push-timeout", 70000)
+        streammux.set_property("batched-push-timeout", 10000)
         streammux.set_property("live-source", 1)
         streammux.set_property("nvbuf-memory-type", 0)
     g_pipeline.add(streammux)
